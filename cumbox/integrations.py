@@ -1,0 +1,93 @@
+"""Verified source bindings only; never runtime grants or private-state transfer."""
+import json
+from pathlib import Path
+import re
+import subprocess
+
+
+MANIFEST = Path(__file__).resolve().parents[1] / "contracts" / "REPOSITORY_BINDINGS_V1.json"
+SHA = re.compile(r"^[a-f0-9]{40}$")
+ALLOWED_REPOS = frozenset({"thebrazenbeard/sexuality", "thebrazenbeard/pleasure", "thebrazenbeard/meso-crct"})
+ALLOWED_STATES = {
+    "research_contract_only",
+    "optional_t0_diagnostic_only",
+    "optional_synthetic_diagnostic_only",
+}
+
+
+def load_bindings():
+    """Read a public-safe source snapshot, fail closed on forbidden capabilities."""
+    try:
+        data = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError("public source registry unavailable") from None
+    if (not isinstance(data, dict) or data.get("schema_version") != 1
+            or data.get("allow_human_entry") is not False
+            or data.get("allow_private_content_export") is not False
+            or not isinstance(data.get("dependencies"), list)
+            or not isinstance(data.get("aliases"), dict)):
+        raise ValueError("unsupported public binding contract")
+    seen = set()
+    for b in data["dependencies"]:
+        if (not isinstance(b, dict)
+                or not isinstance(b.get("repo"), str)
+                or not b["repo"].startswith("thebrazenbeard/")
+                or b["repo"] in seen
+                or b["repo"] not in ALLOWED_REPOS
+                or not isinstance(b.get("sha"), str)
+                or not SHA.fullmatch(b["sha"])
+                or b.get("active_by_default") is not False
+                or b.get("state") not in ALLOWED_STATES
+                or not isinstance(b.get("claims"), list)
+                or "consent" in b["claims"]):
+            raise ValueError("unverified or unsafe public binding")
+        seen.add(b["repo"])
+    if data["aliases"] != {"thebrazenbeard/orgasm": "thebrazenbeard/pleasure"}:
+        raise ValueError("legacy alias must preserve Pleasure source identity")
+    if data["aliases"]["thebrazenbeard/orgasm"] not in seen:
+        raise ValueError("dangling legacy alias")
+    return data
+
+
+def resolve_repo(repo):
+    """Resolve a trusted current or legacy repo without installing anything."""
+    data = load_bindings()
+    if not isinstance(repo, str):
+        raise ValueError("unknown repository")
+    canonical = data["aliases"].get(repo, repo)
+    for binding in data["dependencies"]:
+        if binding["repo"] == canonical:
+            return dict(binding)
+    raise ValueError("repository has no public source binding")
+
+
+def _run_git(path, *args):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(path), *args], capture_output=True,
+            text=True, timeout=4, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ValueError("local source verification unavailable") from None
+    if result.returncode:
+        raise ValueError("local Git verification failed")
+    return result.stdout.strip()
+
+
+def _clean_git_head_matches(checkout, expected_sha):
+    """Require exact source identity and no modified or untracked code."""
+    if not isinstance(expected_sha, str) or not SHA.fullmatch(expected_sha):
+        raise ValueError("unverified expected source SHA")
+    path = Path(checkout)
+    if not path.is_dir() or _run_git(path, "rev-parse", "--verify", "HEAD") != expected_sha:
+        raise ValueError("local dependency source does not match pinned head")
+    if _run_git(path, "status", "--porcelain", "--untracked-files=all"):
+        raise ValueError("dependency checkout has unreviewed changes")
+    return True
+
+
+def verify_local_checkout(checkout, repo):
+    """Verify exact approved commit without fetching, installing or executing code."""
+    binding = resolve_repo(repo)
+    if repo == "thebrazenbeard/orgasm":
+        raise ValueError("historical alias cannot activate a second engine")
+    return _clean_git_head_matches(checkout, binding["sha"])
