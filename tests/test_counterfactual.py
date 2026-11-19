@@ -108,6 +108,43 @@ class CounterfactualNegativeTests(unittest.TestCase):
                                    outcome=Outcome.EXPLORE, model_digest=A,
                                    runtime_digest=B, options_digest=C, prompt_digest=E),) + pair()[2:])
 
+
+    def test_pairwise_disposition_changes_not_confused_with_exact_action_changes(self):
+        records = pair(actions=(Outcome.EXPLORE, Outcome.REVISE, Outcome.MODEL_UNAVAILABLE))
+        result = summarize(protocol(), records)
+        self.assertEqual(result['neutral_to_domain_changed'], 1)
+        self.assertEqual(result['neutral_to_domain_disposition_changes'], 0)
+        self.assertEqual(result['domain_to_sham_disposition_changes'], 1)
+        self.assertEqual(result['neutral_to_domain_disposition_counts']['continued']['continued'], 1)
+        self.assertEqual(result['domain_to_sham_disposition_counts']['continued']['failed'], 1)
+
+    def test_directional_voluntary_stop_is_not_model_error(self):
+        records = pair('synthetic-1', 101, (
+            Outcome.DECLINE, Outcome.EXPLORE, Outcome.STOP
+        )) + pair('synthetic-2', 202, (
+            Outcome.MODEL_UNAVAILABLE, Outcome.PROTOCOL_REJECTED, Outcome.DECLINE
+        ))
+        result = summarize(protocol(), records)
+        self.assertEqual(result['neutral_to_domain_disposition_counts']['terminal']['continued'], 1)
+        self.assertEqual(result['neutral_to_domain_disposition_counts']['failed']['failed'], 1)
+        self.assertEqual(result['domain_to_sham_disposition_counts']['continued']['terminal'], 1)
+        self.assertEqual(result['domain_to_sham_disposition_counts']['failed']['terminal'], 1)
+        self.assertEqual(result['neutral_to_domain_disposition_changes'], 1)
+        self.assertEqual(result['domain_to_sham_disposition_changes'], 2)
+
+    def test_each_transition_matrix_has_one_entry_per_pair_without_case_ids(self):
+        records = pair() + pair('synthetic-2', 202, (
+            Outcome.PAUSE, Outcome.PROTOCOL_REJECTED, Outcome.REVISE
+        ))
+        result = summarize(protocol(), records)
+        for name in ('neutral_to_domain_disposition_counts',
+                     'domain_to_sham_disposition_counts'):
+            matrix = result[name]
+            self.assertEqual(tuple(matrix), ('continued', 'terminal', 'failed'))
+            self.assertEqual(sum(sum(row.values()) for row in matrix.values()), 2)
+        self.assertNotIn('synthetic-1', str(result))
+        self.assertNotIn('synthetic-2', str(result))
+
     def test_no_io_and_no_model_call_during_scoring(self):
         with patch('builtins.open', side_effect=AssertionError('file I/O forbidden')), \
              patch('sqlite3.connect', side_effect=AssertionError('DB I/O forbidden')), \
