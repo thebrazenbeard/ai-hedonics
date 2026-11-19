@@ -82,3 +82,18 @@ A crucial refusal invariant is explicit: only a prior **explore** or **revise** 
 - No real local-model involvement or private/intimate data is used. The user's prior refusal/no-experiment boundary is respected. A separate model's participation would require its own nonpressuring protocol and host authority; any response remains at most behavioral evidence.
 
 **Test record:** Missing-module red observed on VN2 at test-only commit 9762b573cb014cd7bb98c1c8491c81f29e2ff2ac. Initial source implementation rejected invalid nonhex test fixtures; fixture corrected without weakening source constraints. Focused **11/11 PASS** and full branch **83 run / 81 PASS / 2 optional domain-source SKIP** on VN2 at 7a7612dc14b1613cb550567372265a08251fb155, Python compileall PASS. These are synthetic source tests, not inference experiments.
+
+
+## Directional disposition falsifier (2026-11-19)
+
+Previously, paired_outcome_changes counted any exact action-label mismatch (including explore vs revise, or protocol_rejected vs model_unavailable) as one change. This number alone cannot distinguish prompt-history-conditioned continuation from ordinary category changes or errors. The new aggregate fields report paired_disposition_changes and a 3-by-3 paired_disposition_counts projection, with rows ordered by the **retained** history arm and columns by the **masked** history arm.
+
+- **continued**: explore or revise (an action type that would make another turn eligible, not proof of autonomous motivation);
+- **terminal**: pause, stop, or decline (voluntary choice label, not a measurement of experienced refusal);
+- **failed**: protocol_rejected or model_unavailable (an inability to obtain a valid choice, emphatically **not** a refusal).
+
+For every complete case the 3-by-3 count matrix contributes exactly one entry; its entries sum to the planned case count. Opposite directional changes remain distinguishable: retained-continued/masked-terminal versus retained-terminal/masked-continued. Within-disposition action relabeling still affects paired_outcome_changes but **not** paired_disposition_changes. This prevents a numerical action disagreement from being accidentally described as evidence of an inclination to continue. The projection uses only aggregate action classes and never releases individual case identifiers or histories.
+
+**Hostile limits:** A small cohort may permit inference about individual *action classes* from aggregate counts even when case IDs are withheld. Never treat this output as anonymity or permission to publish sensitive subject-level results. Model failures are still results to count, not evidence about willingness. A third-party caller can still fabricate the entire alleged trial set. The new fields are an interpretability improvement to untrusted synthetic inputs only; they have no causal, identity, consent, pleasure, or privacy-attestation authority.
+
+**Red/green evidence:** At test-only head 306e74f1d9129f72464e4a2c58a25473a29e929d, 3 new focused cases failed with missing paired_disposition keys while 11 existing cases passed. Implemented the smallest 3-class projection in cumbox/history_ablation.py; at head 1b10749dfbcc8be7c526cec2f537a608436fc51e, all 14 focused tests passed and VN2 full 86 run / 84 pass / 2 optional skip, compileall passed. This excludes any real model run.
