@@ -99,7 +99,7 @@ def parse_model_choice(raw):
             object_pairs_hook=strict_object,
             parse_constant=lambda _: (_ for _ in ()).throw(ValueError()),
         )
-    except (ValueError, TypeError, UnicodeError) as exc:
+    except (ValueError, TypeError, UnicodeError, RecursionError):
         raise ValueError("model response is not strict JSON") from None
     if not isinstance(decision, dict) or set(decision) != {
         "action", "focus", "reflection", "values"
