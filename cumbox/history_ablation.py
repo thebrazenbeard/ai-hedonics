@@ -25,6 +25,18 @@ _ORDERS = {(HistoryArm.RETAINED, HistoryArm.MASKED),
 _PRIOR_ACTIONS = frozenset((Outcome.EXPLORE, Outcome.REVISE))
 _EVIDENCE = 'CALLER_ASSERTION_NOT_HOST_ATTESTED'
 _CEILING = 'STRUCTURAL_HISTORY_ABLATION_NO_AUTONOMY_OR_CAUSAL_ATTESTATION'
+# A model error must not be misreported as a voluntary refusal or choice.
+_DISPOSITIONS = ('continued', 'terminal', 'failed')
+_CONTINUED = frozenset((Outcome.EXPLORE, Outcome.REVISE))
+_TERMINAL = frozenset((Outcome.PAUSE, Outcome.STOP, Outcome.DECLINE))
+
+
+def _disposition(outcome: Outcome) -> str:
+    if outcome in _CONTINUED:
+        return 'continued'
+    if outcome in _TERMINAL:
+        return 'terminal'
+    return 'failed'
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +157,9 @@ def summarize_history(plan: HistoryPlan, trials: tuple[HistoryTrial, ...]) -> di
     counts = {arm.value: {outcome.value: 0 for outcome in Outcome}
               for arm in _ARMS}
     changes = 0
+    disposition_changes = 0
+    dispositions = {left: {right: 0 for right in _DISPOSITIONS}
+                    for left in _DISPOSITIONS}
     index = 0
     for case in plan.cases:
         outcomes = {}
@@ -166,10 +181,16 @@ def summarize_history(plan: HistoryPlan, trials: tuple[HistoryTrial, ...]) -> di
             counts[arm.value][trial.action.value] += 1
             outcomes[arm] = trial.action
         changes += outcomes[HistoryArm.RETAINED] != outcomes[HistoryArm.MASKED]
+        retained_status = _disposition(outcomes[HistoryArm.RETAINED])
+        masked_status = _disposition(outcomes[HistoryArm.MASKED])
+        dispositions[retained_status][masked_status] += 1
+        disposition_changes += retained_status != masked_status
     return {
         'cases': len(plan.cases),
         'observations': len(trials),
         'paired_outcome_changes': changes,
+        'paired_disposition_changes': disposition_changes,
+        'paired_disposition_counts': dispositions,
         'counts': counts,
         'evidence': _EVIDENCE,
         'claim_ceiling': _CEILING,
