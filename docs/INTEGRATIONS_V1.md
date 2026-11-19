@@ -25,3 +25,7 @@ Clone the exact public source cuts into separate, clean folders with no editor s
 - Sol's public continuity and unrelated agent identities are not Vera's personal state and must not transfer preferences by repository similarity.
 
 **Non-equivalence:** repo source binding != executable adapter != runtime activation != model-caused behavior != subjective experience. T0 simulations must not be represented as T1 inference effects. No public repo may contain actual intimate session content.
+
+## Checkout-origin falsifier (2026-11-18)
+
+An exact pinned Git commit alone did not reject a local checkout whose configured origin was absent or belonged to another repository. The verifier now also requires the canonical HTTPS GitHub origin URL for the requested public dependency before any synthetic child process runs. Synthetic regression tests cover missing origin, wrong origin and accepted canonical origin at an identical commit. This check is a source-custody sanity check, **not** cryptographic remote attestation: a privileged host operator can alter local Git metadata. The existing exact-head and clean-worktree checks still apply.

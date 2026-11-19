@@ -104,4 +104,11 @@ def verify_local_checkout(checkout, repo):
     binding = resolve_repo(repo)
     if repo == "thebrazenbeard/orgasm":
         raise ValueError("historical alias cannot activate a second engine")
+    # A matching commit alone does not establish which canonical source
+    # checkout was supplied. This is a provenance sanity check, not proof
+    # against a malicious local administrator who can rewrite Git config.
+    expected = f"https://github.com/{repo}.git"
+    origin = _run_git(checkout, "remote", "get-url", "origin")
+    if origin != expected:
+        raise ValueError("dependency checkout origin is not canonical")
     return _clean_git_head_matches(checkout, binding["sha"])

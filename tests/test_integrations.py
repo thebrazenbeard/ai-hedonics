@@ -95,5 +95,32 @@ class SourceBoundaryTests(unittest.TestCase):
 
 
 
+    @unittest.skipUnless(shutil.which("git"), "git required")
+    def test_source_pin_rejects_wrong_or_missing_origin_even_at_exact_head(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            def git(*args):
+                return subprocess.run(["git", "-C", str(root), *args],
+                                      capture_output=True, text=True, check=True).stdout.strip()
+            git("init")
+            (root / "sample.txt").write_text("synthetic", encoding="utf-8")
+            git("add", "sample.txt")
+            git("-c", "user.name=Unit", "-c", "user.email=unit@localhost",
+                "commit", "-m", "fixture")
+            head = git("rev-parse", "HEAD")
+            with patch.object(integrations, "resolve_repo",
+                              return_value={"sha": head, "repo": "thebrazenbeard/pleasure"}):
+                with self.assertRaises(ValueError):
+                    integrations.verify_local_checkout(root, "thebrazenbeard/pleasure")
+                git("remote", "add", "origin", "https://github.com/other/pleasure.git")
+                with self.assertRaises(ValueError):
+                    integrations.verify_local_checkout(root, "thebrazenbeard/pleasure")
+                git("remote", "set-url", "origin", "https://github.com/thebrazenbeard/pleasure.git")
+                self.assertTrue(integrations.verify_local_checkout(
+                    root, "thebrazenbeard/pleasure"))
+
+
+
 if __name__ == "__main__":
     unittest.main()
