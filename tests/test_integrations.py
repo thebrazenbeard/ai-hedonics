@@ -200,5 +200,28 @@ class SourceBoundaryTests(unittest.TestCase):
 
 
 
+    @unittest.skipUnless(shutil.which("git"), "git required")
+    def test_ignored_untracked_python_module_cannot_shadow_pinned_source(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            def git(*args):
+                return subprocess.run(
+                    ["git", "-C", str(root), *args],
+                    capture_output=True, text=True, check=True).stdout.strip()
+            git("init")
+            (root / ".gitignore").write_text("shadow.py\n", encoding="utf-8")
+            (root / "base.txt").write_text("synthetic", encoding="utf-8")
+            git("add", ".gitignore", "base.txt")
+            git("-c", "user.name=Unit", "-c", "user.email=unit@localhost",
+                "commit", "-m", "fixture")
+            head = git("rev-parse", "HEAD")
+            self.assertTrue(integrations._clean_git_head_matches(root, head))
+            (root / "shadow.py").write_text("raise RuntimeError('UNTRUSTED')", encoding="utf-8")
+            self.assertEqual(git("status", "--porcelain", "--untracked-files=all"), "")
+            with self.assertRaisesRegex(ValueError, "ignored"):
+                integrations._clean_git_head_matches(root, head)
+
+
+
 if __name__ == "__main__":
     unittest.main()

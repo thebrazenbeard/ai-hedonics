@@ -107,6 +107,10 @@ def _clean_git_head_matches(checkout, expected_sha):
         raise ValueError("local dependency source does not match pinned head")
     if _run_git(path, "status", "--porcelain", "--untracked-files=all"):
         raise ValueError("dependency checkout has unreviewed changes")
+    # Git status hides ignored files, but Python imports do not. An ignored
+    # shadow module could execute despite a matching HEAD and clean status.
+    if _run_git(path, "ls-files", "--others", "--ignored", "--exclude-standard"):
+        raise ValueError("dependency checkout contains ignored unreviewed content")
     # Tracked links and gitlinks can redirect imports outside the pinned tree
     # or introduce an independently versioned submodule.
     for entry in _run_git(path, "ls-files", "--stage").splitlines():
