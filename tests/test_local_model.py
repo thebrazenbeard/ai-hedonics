@@ -113,6 +113,25 @@ class LocalModelTests(unittest.TestCase):
 
 
 
+    def test_ollama_envelope_duplicate_keys_cannot_override_model_choice(self):
+        # A duplicate envelope key must not let a later value replace an
+        # earlier response, regardless of the decision parser's own strictness.
+        payloads = [
+            b'{"message":{"content":"PRIVATE_THOUGHT"},'
+            b'"message":{"content":"{}"}}',
+            b'{"message":{"content":"{}","content":"PRIVATE_THOUGHT"}}',
+            b'{"message":{"content":"{}"},"done":true,"done":false}',
+        ]
+        model = LocalOllama("test-model:1", endpoint=self.url)
+        for payload in payloads:
+            with self.subTest(case=payload.count(b"PRIVATE_THOUGHT")):
+                self.server.reply_override = payload
+                with self.assertRaisesRegex(
+                    RuntimeError, r"^local model response invalid$"
+                ) as raised:
+                    model.generate([{"role": "system", "content": "synthetic"}])
+                self.assertNotIn("PRIVATE_THOUGHT", str(raised.exception))
+
     def test_adversarial_response_fail_closed_without_private_content(self):
         from cumbox.model import MAX_REPLY_BYTES
         cases = [

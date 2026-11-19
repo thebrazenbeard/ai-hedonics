@@ -76,8 +76,17 @@ class LocalOllama:
             raise RuntimeError("local model call failed") from None
         if len(raw) > MAX_REPLY_BYTES:
             raise RuntimeError("local model reply oversized")
+        def reject_duplicate_fields(pairs):
+            obj = {}
+            for key, value in pairs:
+                if key in obj:
+                    raise ValueError("duplicate envelope field")
+                obj[key] = value
+            return obj
+
         try:
-            obj = json.loads(raw)
+            obj = json.loads(raw, object_pairs_hook=reject_duplicate_fields,
+                             parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
             answer = obj["message"]["content"]
         except (ValueError, KeyError, TypeError, UnicodeDecodeError, RecursionError):
             raise RuntimeError("local model response invalid") from None
