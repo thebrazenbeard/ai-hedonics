@@ -11,7 +11,7 @@ from cumbox.history_ablation import (
     HistoryTrial, summarize_history,
 )
 
-D = tuple(chr(97 + k) * 64 for k in range(9))
+D = tuple(str(k) * 64 for k in range(1, 10))
 ORDERS = tuple(itertools.permutations(tuple(HistoryArm)))
 MODEL, RUNTIME, OPTIONS, SYSTEM, BASE, RETAINED, MASKED, MANIFEST, OTHER = D
 
