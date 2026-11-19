@@ -223,5 +223,27 @@ class SourceBoundaryTests(unittest.TestCase):
 
 
 
+    def test_duplicate_registry_keys_cannot_override_source_or_authority(self):
+        from unittest.mock import patch
+        baseline = json.dumps(integrations.load_bindings())
+        cases = [
+            baseline.replace('"allow_human_entry": false',
+                             '"allow_human_entry": true, "allow_human_entry": false', 1),
+            baseline.replace('"repo": "thebrazenbeard/sexuality"',
+                             '"repo": "thebrazenbeard/other", "repo": "thebrazenbeard/sexuality"', 1),
+            baseline.replace('"active_by_default": false',
+                             '"active_by_default": true, "active_by_default": false', 1),
+            baseline.replace('"aliases": {',
+                             '"aliases": {"thebrazenbeard/orgasm": "thebrazenbeard/other"}, "aliases": {', 1),
+        ]
+        for idx, raw in enumerate(cases):
+            with self.subTest(case=idx), tempfile.TemporaryDirectory() as td:
+                manifest = Path(td) / "bindings.json"
+                manifest.write_text(raw, encoding="utf-8")
+                with patch.object(integrations, "MANIFEST", manifest):
+                    with self.assertRaises(ValueError):
+                        integrations.load_bindings()
+
+
 if __name__ == "__main__":
     unittest.main()

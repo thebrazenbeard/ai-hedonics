@@ -28,10 +28,21 @@ DEPENDENCY_KEYS = frozenset({
 })
 
 
+def _strict_object(pairs):
+    """Reject ambiguous JSON fields at every nesting depth."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate public registry key")
+        result[key] = value
+    return result
+
+
 def load_bindings():
     """Read a public-safe source snapshot, fail closed on forbidden capabilities."""
     try:
-        data = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        data = json.loads(MANIFEST.read_text(encoding="utf-8"),
+                          object_pairs_hook=_strict_object)
     except (OSError, ValueError) as exc:
         raise ValueError("public source registry unavailable") from None
     if (not isinstance(data, dict) or set(data) != TOP_LEVEL_KEYS
