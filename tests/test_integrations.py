@@ -122,5 +122,67 @@ class SourceBoundaryTests(unittest.TestCase):
 
 
 
+    @unittest.skipUnless(shutil.which("git"), "git required")
+    def test_dependency_source_rejects_nested_checkout_path(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            def git(*args):
+                return subprocess.run(["git", "-C", str(root), *args],
+                                      capture_output=True, text=True, check=True).stdout.strip()
+            git("init")
+            (root / "src").mkdir()
+            (root / "src" / "module.py").write_text("pass", encoding="utf-8")
+            git("add", ".")
+            git("-c", "user.name=Unit", "-c", "user.email=unit@localhost",
+                "commit", "-m", "fixture")
+            head = git("rev-parse", "HEAD")
+            with patch.object(integrations, "resolve_repo",
+                              return_value={"sha": head, "repo": "thebrazenbeard/pleasure"}):
+                git("remote", "add", "origin", "https://github.com/thebrazenbeard/pleasure.git")
+                with self.assertRaises(ValueError):
+                    integrations.verify_local_checkout(root / "src", "thebrazenbeard/pleasure")
+
+    @unittest.skipUnless(shutil.which("git"), "git required")
+    def test_dependency_source_rejects_tracked_symlink_and_submodule(self):
+        from unittest.mock import patch
+        for mode in ("120000", "160000"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as td:
+                root = Path(td)
+                def git(*args):
+                    return subprocess.run(["git", "-C", str(root), *args],
+                                          capture_output=True, text=True, check=True).stdout.strip()
+                git("init")
+                (root / "base.txt").write_text("base", encoding="utf-8")
+                git("add", "base.txt")
+                git("-c", "user.name=Unit", "-c", "user.email=unit@localhost",
+                    "commit", "-m", "base")
+                if mode == "120000":
+                    blob = subprocess.run(
+                        ["git", "-C", str(root), "hash-object", "-w", "--stdin"],
+                        input="../outside", capture_output=True, text=True, check=True).stdout.strip()
+                    git("update-index", "--add", "--cacheinfo", f"{mode},{blob},src/link")
+                else:
+                    blob = git("rev-parse", "HEAD")
+                    git("update-index", "--add", "--cacheinfo", f"{mode},{blob},src/nested")
+                git("-c", "user.name=Unit", "-c", "user.email=unit@localhost",
+                    "commit", "-m", "fixture")
+                head = git("rev-parse", "HEAD")
+                with patch.object(integrations, "resolve_repo",
+                                  return_value={"sha": head, "repo": "thebrazenbeard/pleasure"}):
+                    git("remote", "add", "origin", "https://github.com/thebrazenbeard/pleasure.git")
+                    # A tracked link can make the working tree appear dirty on
+                    # Windows without symlink support. Mask only status here so
+                    # rejection is independently attributable to index mode.
+                    original_run_git = integrations._run_git
+                    def status_clean(path, *args):
+                        if args[:2] == ("status", "--porcelain"):
+                            return ""
+                        return original_run_git(path, *args)
+                    with patch.object(integrations, "_run_git", side_effect=status_clean):
+                        with self.assertRaisesRegex(ValueError, "linked content"):
+                            integrations.verify_local_checkout(root, "thebrazenbeard/pleasure")
+
+
 if __name__ == "__main__":
     unittest.main()

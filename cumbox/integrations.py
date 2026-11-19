@@ -92,10 +92,22 @@ def _clean_git_head_matches(checkout, expected_sha):
     if not isinstance(expected_sha, str) or not SHA.fullmatch(expected_sha):
         raise ValueError("unverified expected source SHA")
     path = Path(checkout)
-    if not path.is_dir() or _run_git(path, "rev-parse", "--verify", "HEAD") != expected_sha:
+    if not path.is_dir() or path.is_symlink():
+        raise ValueError("local dependency source is not a direct directory")
+    # git -C accepts nested directories and returns the parent repository's
+    # HEAD; importing from an arbitrary subtree would silently change scope.
+    toplevel = _run_git(path, "rev-parse", "--show-toplevel")
+    if Path(toplevel).resolve() != path.resolve():
+        raise ValueError("dependency checkout must be repository root")
+    if _run_git(path, "rev-parse", "--verify", "HEAD") != expected_sha:
         raise ValueError("local dependency source does not match pinned head")
     if _run_git(path, "status", "--porcelain", "--untracked-files=all"):
         raise ValueError("dependency checkout has unreviewed changes")
+    # Tracked links and gitlinks can redirect imports outside the pinned tree
+    # or introduce an independently versioned submodule.
+    for entry in _run_git(path, "ls-files", "--stage").splitlines():
+        if entry.startswith(("120000 ", "160000 ")):
+            raise ValueError("dependency source contains linked content")
     return True
 
 

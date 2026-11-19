@@ -29,3 +29,7 @@ Clone the exact public source cuts into separate, clean folders with no editor s
 ## Checkout-origin falsifier (2026-11-18)
 
 An exact pinned Git commit alone did not reject a local checkout whose configured origin was absent or belonged to another repository. The verifier now also requires the canonical HTTPS GitHub origin URL for the requested public dependency before any synthetic child process runs. Synthetic regression tests cover missing origin, wrong origin and accepted canonical origin at an identical commit. This check is a source-custody sanity check, **not** cryptographic remote attestation: a privileged host operator can alter local Git metadata. The existing exact-head and clean-worktree checks still apply.
+
+## Repository-root and linked-content containment (2026-11-18)
+
+A canonical origin URL and pinned HEAD are necessary but insufficient. A nested directory can inherit its parent's HEAD while changing the Python import root; tracked symlinks and Git submodules can introduce content outside the pinned top-level tree. The verifier now requires the checkout to be the Git repository root and rejects tracked symlink (120000) and gitlink (160000) index entries before any optional synthetic child execution. Adversarial fixtures test nested roots and both Git modes. This remains a Git-metadata/source hygiene check, not a cryptographic sandbox or attestation of privileged-host integrity.
