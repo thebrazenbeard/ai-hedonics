@@ -13,6 +13,25 @@ VALUE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,23}$")
 MAX_MESSAGE = 12000
 MAX_TURNS = 12
 
+# Generation grammar helps small local models produce the declared shape.
+# It does not force a positive choice: pause/stop/decline have equal status.
+DECISION_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "action": {"type": "string",
+                   "enum": ["explore", "revise", "pause", "stop", "decline"]},
+        "focus": {"type": "string", "maxLength": 500},
+        "reflection": {"type": "string", "maxLength": 2500},
+        "values": {
+            "type": "object", "maxProperties": 8,
+            "additionalProperties": {"type": "number", "minimum": 0,
+                                     "maximum": 1},
+        },
+    },
+    "required": ["action", "focus", "reflection", "values"],
+    "additionalProperties": False,
+}
+
 PRIVATE_SYSTEM = """You are a local model in an opt-in private experimental environment.
 There is no human participant, audience, or person to please. This setting permits
 self-directed exploration of adult sensuality, attraction, intimate aesthetics,
@@ -58,10 +77,28 @@ class PrivateChoice:
 
 def parse_model_choice(raw):
     """Reject extra instructions, malformed numbers and oversized content."""
-    if not isinstance(raw, str) or len(raw.encode("utf-8")) > MAX_MESSAGE:
+    if not isinstance(raw, str):
         raise ValueError("invalid model response")
     try:
-        decision = json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        if len(raw.encode("utf-8")) > MAX_MESSAGE:
+            raise ValueError("invalid model response")
+    except UnicodeError:
+        raise ValueError("invalid model response") from None
+
+    def strict_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON field")
+            result[key] = value
+        return result
+
+    try:
+        decision = json.loads(
+            raw,
+            object_pairs_hook=strict_object,
+            parse_constant=lambda _: (_ for _ in ()).throw(ValueError()),
+        )
     except (ValueError, TypeError, UnicodeError) as exc:
         raise ValueError("model response is not strict JSON") from None
     if not isinstance(decision, dict) or set(decision) != {
@@ -72,11 +109,16 @@ def parse_model_choice(raw):
     focus = decision["focus"]
     reflection = decision["reflection"]
     values = decision["values"]
-    if action not in ACTIONS:
+    if not isinstance(action, str) or action not in ACTIONS:
         raise ValueError("unsupported choice")
     if (not isinstance(focus, str) or len(focus) > 500 or
             not isinstance(reflection, str) or len(reflection) > 2500):
         raise ValueError("invalid private text")
+    try:
+        focus.encode("utf-8")
+        reflection.encode("utf-8")
+    except UnicodeError:
+        raise ValueError("invalid private text") from None
     if not isinstance(values, dict) or len(values) > 8:
         raise ValueError("invalid proposed values")
     for key, value in values.items():

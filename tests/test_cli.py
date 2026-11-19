@@ -72,5 +72,23 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("SECRET", result.stderr + result.stdout)
 
 
+    def test_reasoning_disable_flag_is_opt_in_and_redacted(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            endpoint = f"http://127.0.0.1:{server.server_address[1]}/api/chat"
+            result = self.invoke("--model", "mock:1", "--endpoint", endpoint,
+                                 "--max-turns", "1", "--think-off")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn(SECRET, result.stdout + result.stderr)
+            self.assertEqual(json.loads(result.stdout)["ending"], "model_stop")
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+
+
 if __name__ == "__main__":
     unittest.main()

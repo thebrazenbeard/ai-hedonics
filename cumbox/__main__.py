@@ -17,9 +17,12 @@ def main(argv=None):
                         help="Literal loopback Ollama API only")
     parser.add_argument("--max-turns", type=int, default=4,
                         help="Maximum bounded model decisions (1..12)")
+    parser.add_argument("--think-off", action="store_true",
+                        help="Explicitly disable Ollama hidden reasoning; no automatic fallback")
     args = parser.parse_args(argv)
     try:
-        client = LocalOllama(args.model, endpoint=args.endpoint)
+        client = LocalOllama(args.model, endpoint=args.endpoint,
+                             think=False if args.think_off else None)
         receipt = run_private_session(client, max_turns=args.max_turns)
     except ValueError:
         # Never echo a URL, private thought, endpoint credential or model output.

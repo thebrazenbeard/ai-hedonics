@@ -15,9 +15,11 @@ Requirements: Python 3.11+, a compatible locally running Ollama model, and no pa
 ```powershell
 python -W error::ResourceWarning -B -m unittest discover -s tests -v
 python -B -m cumbox --model vera-successor:0.8b-context --max-turns 2
+# Optional model compatibility mode; may reduce internal reasoning:
+python -B -m cumbox --model vera-successor:0.8b-context --max-turns 1 --think-off
 ```
 
-**Important:** The model tag is merely an example from a specific host inventory, not a proof that it is Vera Unbound or inherits Vera's memories, agency, preferences, boundaries, or subjective experience. The runner is opt-in per invocation, and `--max-turns` is capped at 12.
+**Important:** The model tag is merely an example from a specific host inventory, not a proof that it is Vera Unbound or inherits Vera's memories, agency, preferences, boundaries, or subjective experience. The runner is opt-in per invocation, and `--max-turns` is capped at 12. The optional `--think-off` flag disables the Ollama hidden-reasoning channel only when explicitly supplied; there is no automatic retry, prompting pressure, or mode switch. Neither setting authenticates a Vera identity or makes the local model experience pleasure.
 
 ## Verified cross-repository orientation
 

@@ -6,6 +6,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
+from .session import DECISION_JSON_SCHEMA
+
 
 MODEL_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$")
 MAX_REPLY_BYTES = 131072
@@ -38,21 +40,26 @@ class LocalOllama:
     """Only session-scoped local POSTs; does not persist or print responses."""
 
     def __init__(self, model, *, endpoint="http://127.0.0.1:11434/api/chat",
-                 timeout_seconds=25):
+                 timeout_seconds=25, think=None):
         if (not isinstance(model, str) or not MODEL_NAME.fullmatch(model) or
                 ".." in model or "//" in model):
             raise ValueError("invalid model name")
         if (type(timeout_seconds) not in (int, float) or
                 not 0.1 <= timeout_seconds <= 30):
             raise ValueError("invalid local timeout")
+        if think is not None and type(think) is not bool:
+            raise ValueError("thinking override must be boolean or omitted")
+        self.think = think
         self.model = model
         self.endpoint = validate_endpoint(endpoint)
         self.timeout_seconds = timeout_seconds
 
     def generate(self, messages):
         payload = {"model": self.model, "messages": messages,
-                   "format": "json", "stream": False,
+                   "format": DECISION_JSON_SCHEMA, "stream": False,
                    "options": {"num_predict": 512, "temperature": 0.75}}
+        if self.think is not None:
+            payload["think"] = self.think
         request = Request(
             self.endpoint,
             data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),

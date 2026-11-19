@@ -71,7 +71,14 @@ class LocalModelTests(unittest.TestCase):
         self.assertEqual(request["path"], "/api/chat")
         self.assertEqual(request["body"]["stream"], False)
         self.assertEqual(request["body"]["model"], "test-model:1")
-        self.assertEqual(request["body"]["format"], "json")
+        schema = request["body"]["format"]
+        self.assertIsInstance(schema, dict)
+        self.assertEqual(schema["type"], "object")
+        self.assertFalse(schema["additionalProperties"])
+        self.assertEqual(set(schema["required"]), {"action", "focus", "reflection", "values"})
+        self.assertEqual(set(schema["properties"]["action"]["enum"]),
+                         {"explore", "revise", "pause", "stop", "decline"})
+        self.assertEqual(schema["properties"]["values"]["type"], "object")
 
     def test_redirect_cannot_reach_external_host(self):
         self.server.should_redirect = True
@@ -87,6 +94,19 @@ class LocalModelTests(unittest.TestCase):
         for sec in (0, -1, 60):
             with self.subTest(timeout=sec), self.assertRaises(ValueError):
                 LocalOllama("test-model:1", endpoint=self.url, timeout_seconds=sec)
+
+
+    def test_reasoning_disable_is_explicit_and_never_implicit(self):
+        off = LocalOllama("test-model:1", endpoint=self.url, think=False)
+        off.generate([{"role": "system", "content": "synthetic"}])
+        self.assertIs(self.server.requests[-1]["body"]["think"], False)
+        default = LocalOllama("test-model:1", endpoint=self.url)
+        default.generate([{"role": "system", "content": "synthetic"}])
+        self.assertNotIn("think", self.server.requests[-1]["body"])
+        for bad in ("false", 0, 1):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                LocalOllama("test-model:1", endpoint=self.url, think=bad)
+
 
 
 if __name__ == "__main__":

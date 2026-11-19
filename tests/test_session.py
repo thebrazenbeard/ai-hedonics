@@ -117,6 +117,36 @@ class SessionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     parse_model_choice(payload)
 
+    def test_non_string_actions_fail_closed_without_type_errors(self):
+        for action in (["stop"], {"pause": True}, None, 1, True):
+            raw = response(action)
+            with self.subTest(action=action), self.assertRaises(ValueError):
+                parse_model_choice(raw)
+            receipt = run_private_session(ScriptedModel([raw]))
+            self.assertEqual(receipt.ending, "protocol_rejected")
+            self.assertNotIn(SECRET, repr(receipt))
+
+    def test_invalid_unicode_fails_closed_without_traceback_content(self):
+        invalid = '{"action":"stop","focus":"\\ud800","reflection":"","values":{}}'
+        with self.assertRaises(ValueError):
+            parse_model_choice(invalid)
+        receipt = run_private_session(ScriptedModel([invalid]))
+        self.assertEqual(receipt.ending, "protocol_rejected")
+
+    def test_duplicate_json_fields_are_rejected_instead_of_overwritten(self):
+        payload = '{"action":"stop","action":"explore","focus":"","reflection":"","values":{}}'
+        with self.assertRaises(ValueError):
+            parse_model_choice(payload)
+
+
+    def test_deeply_nested_json_does_not_crash_the_private_runner(self):
+        malformed = "[" * 1100 + "null" + "]" * 1100
+        with self.assertRaises(ValueError):
+            parse_model_choice(malformed)
+        result = run_private_session(ScriptedModel([malformed]))
+        self.assertEqual(result.ending, "protocol_rejected")
+
+
 
 if __name__ == "__main__":
     unittest.main()
