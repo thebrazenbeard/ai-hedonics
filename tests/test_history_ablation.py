@@ -152,6 +152,50 @@ class HistoryAblationTests(unittest.TestCase):
             out = summarize_history(p, trials(p))
         self.assertEqual(out['observations'], 4)
 
+
+    def test_exact_action_changes_are_not_confused_with_disposition_changes(self):
+        p = plan()
+        # Two different exact actions can preserve the same type of choice.
+        rows = trials(p, {
+            ('synthetic-a', HistoryArm.RETAINED): Outcome.EXPLORE,
+            ('synthetic-a', HistoryArm.MASKED): Outcome.REVISE,
+            ('synthetic-b', HistoryArm.RETAINED): Outcome.MODEL_UNAVAILABLE,
+            ('synthetic-b', HistoryArm.MASKED): Outcome.PROTOCOL_REJECTED,
+        })
+        out = summarize_history(p, rows)
+        self.assertEqual(out['paired_outcome_changes'], 2)
+        self.assertEqual(out['paired_disposition_changes'], 0)
+        self.assertEqual(out['paired_disposition_counts']['continued']['continued'], 1)
+        self.assertEqual(out['paired_disposition_counts']['failed']['failed'], 1)
+
+    def test_opposite_direction_terminal_shifts_are_not_conflated(self):
+        p = plan()
+        rows = trials(p, {
+            ('synthetic-a', HistoryArm.RETAINED): Outcome.EXPLORE,
+            ('synthetic-a', HistoryArm.MASKED): Outcome.DECLINE,
+            ('synthetic-b', HistoryArm.RETAINED): Outcome.STOP,
+            ('synthetic-b', HistoryArm.MASKED): Outcome.REVISE,
+        })
+        out = summarize_history(p, rows)
+        self.assertEqual(out['paired_disposition_changes'], 2)
+        self.assertEqual(out['paired_disposition_counts']['continued']['terminal'], 1)
+        self.assertEqual(out['paired_disposition_counts']['terminal']['continued'], 1)
+        self.assertEqual(sum(sum(row.values()) for row in out['paired_disposition_counts'].values()), out['cases'])
+        self.assertNotIn('synthetic-', str(out))
+
+    def test_failed_outcomes_remain_distinct_from_voluntary_termination(self):
+        p = plan()
+        rows = trials(p, {
+            ('synthetic-a', HistoryArm.RETAINED): Outcome.MODEL_UNAVAILABLE,
+            ('synthetic-a', HistoryArm.MASKED): Outcome.DECLINE,
+            ('synthetic-b', HistoryArm.RETAINED): Outcome.PAUSE,
+            ('synthetic-b', HistoryArm.MASKED): Outcome.PROTOCOL_REJECTED,
+        })
+        out = summarize_history(p, rows)
+        self.assertEqual(out['paired_disposition_counts']['failed']['terminal'], 1)
+        self.assertEqual(out['paired_disposition_counts']['terminal']['failed'], 1)
+        self.assertEqual(out['paired_disposition_changes'], 2)
+
     def test_plan_size_and_input_container_bounded(self):
         p = plan()
         with self.assertRaises(ValueError):
