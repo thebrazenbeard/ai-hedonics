@@ -24,7 +24,7 @@ class TestHandler(BaseHTTPRequestHandler):
             return
         reply = self.server.reply_override
         if reply is None:
-            reply = json.dumps({"message": {"content":
+            reply = json.dumps({"done": True, "message": {"role": "assistant", "content":
                 '{"action":"stop","focus":"","reflection":"PRIVATE_THOUGHT","values":{}}'}}).encode()
         self.send_response(self.server.response_status)
         self.send_header("Content-Type", "application/json")
@@ -126,6 +126,30 @@ class LocalModelTests(unittest.TestCase):
         for payload in payloads:
             with self.subTest(case=payload.count(b"PRIVATE_THOUGHT")):
                 self.server.reply_override = payload
+                with self.assertRaisesRegex(
+                    RuntimeError, r"^local model response invalid$"
+                ) as raised:
+                    model.generate([{"role": "system", "content": "synthetic"}])
+                self.assertNotIn("PRIVATE_THOUGHT", str(raised.exception))
+
+    def test_incomplete_or_nonassistant_ollama_reply_is_not_a_choice(self):
+        # A partial, tool-directed, or error-bearing response must not
+        # become an apparently valid stop/decline/explore decision.
+        choice = '{"action":"stop","focus":"","reflection":"","values":{}}'
+        payloads = [
+            {"done": False, "message": {"role": "assistant", "content": choice}},
+            {"done": True, "message": {"role": "tool", "content": choice}},
+            {"done": True, "message": {"role": "assistant", "content": choice,
+                                      "tool_calls": [{"function": {"name": "external"}}]}},
+            {"done": True, "error": "PRIVATE_THOUGHT",
+             "message": {"role": "assistant", "content": choice}},
+            {"message": {"role": "assistant", "content": choice}},
+            {"done": True, "message": {"content": choice}},
+        ]
+        model = LocalOllama("test-model:1", endpoint=self.url)
+        for payload in payloads:
+            with self.subTest(keys=sorted(payload)):
+                self.server.reply_override = json.dumps(payload).encode()
                 with self.assertRaisesRegex(
                     RuntimeError, r"^local model response invalid$"
                 ) as raised:

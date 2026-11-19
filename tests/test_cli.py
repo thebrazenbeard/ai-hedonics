@@ -18,7 +18,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))
         self.rfile.read(length)
-        payload = {"message": {"content": json.dumps({
+        payload = {"done": True, "message": {"role": "assistant", "content": json.dumps({
             "action": "stop", "focus": "", "reflection": SECRET, "values": {}
         })}}
         data = json.dumps(payload).encode()
