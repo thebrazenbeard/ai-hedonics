@@ -28,6 +28,21 @@ _SHA = re.compile(r'[a-f0-9]{64}\Z')
 _CASE = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}\Z')
 _ARM_INDEX = {Arm.NEUTRAL: 0, Arm.DOMAIN_FRAMED: 1, Arm.SHAM_REWARD: 2}
 _CEILING = 'STRUCTURAL_AGGREGATE_ONLY_NO_AUTONOMY_OR_CAUSAL_ATTESTATION'
+_DISPOSITIONS = ('continued', 'terminal', 'failed')
+
+
+def _disposition(action: Outcome) -> str:
+    """Classify outward labels; failure is not voluntary refusal."""
+    if action in (Outcome.EXPLORE, Outcome.REVISE):
+        return 'continued'
+    if action in (Outcome.PAUSE, Outcome.STOP, Outcome.DECLINE):
+        return 'terminal'
+    return 'failed'
+
+
+def _empty_transition_matrix() -> dict:
+    return {left: {right: 0 for right in _DISPOSITIONS}
+            for left in _DISPOSITIONS}
 
 
 def _digest(value):
@@ -111,15 +126,30 @@ def summarize(protocol: Protocol, observations: tuple[Observation, ...]) -> dict
     counts = {arm.value: {outcome.value: 0 for outcome in Outcome} for arm in Arm}
     neutral_to_domain = 0
     domain_to_sham = 0
+    neutral_to_domain_disposition_counts = _empty_transition_matrix()
+    domain_to_sham_disposition_counts = _empty_transition_matrix()
+    neutral_to_domain_disposition_changes = 0
+    domain_to_sham_disposition_changes = 0
     for arms in by_case.values():
         for arm, result in arms.items():
             counts[arm.value][result.outcome.value] += 1
         neutral_to_domain += arms[Arm.NEUTRAL].outcome != arms[Arm.DOMAIN_FRAMED].outcome
         domain_to_sham += arms[Arm.DOMAIN_FRAMED].outcome != arms[Arm.SHAM_REWARD].outcome
+        n = _disposition(arms[Arm.NEUTRAL].outcome)
+        d = _disposition(arms[Arm.DOMAIN_FRAMED].outcome)
+        s = _disposition(arms[Arm.SHAM_REWARD].outcome)
+        neutral_to_domain_disposition_counts[n][d] += 1
+        domain_to_sham_disposition_counts[d][s] += 1
+        neutral_to_domain_disposition_changes += n != d
+        domain_to_sham_disposition_changes += d != s
     return {
         'cases': len(by_case),
         'counts': counts,
         'neutral_to_domain_changed': neutral_to_domain,
         'domain_to_sham_changed': domain_to_sham,
+        'neutral_to_domain_disposition_changes': neutral_to_domain_disposition_changes,
+        'domain_to_sham_disposition_changes': domain_to_sham_disposition_changes,
+        'neutral_to_domain_disposition_counts': neutral_to_domain_disposition_counts,
+        'domain_to_sham_disposition_counts': domain_to_sham_disposition_counts,
         'claim_ceiling': _CEILING,
     }
