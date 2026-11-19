@@ -14,6 +14,11 @@ EXPECTED_BINDINGS = {
     "thebrazenbeard/meso-crct": (
         "optional_synthetic_diagnostic_only", ("nonexecutable_reference_intents",)),
 }
+EXPECTED_ROLES = {
+    "thebrazenbeard/sexuality": "public model-neutral evaluation contract; not executable adapter",
+    "thebrazenbeard/pleasure": "model-agnostic bounded source-only pleasure simulator",
+    "thebrazenbeard/meso-crct": "typed reward/drive/learning and adversarial source code; no runtime authority",
+}
 TOP_LEVEL_KEYS = frozenset({
     "schema_version", "as_of", "allow_human_entry",
     "allow_private_content_export", "dependencies", "aliases",
@@ -48,8 +53,7 @@ def load_bindings():
                 or not SHA.fullmatch(b["sha"])
                 or b.get("active_by_default") is not False
                 or b.get("state") != EXPECTED_BINDINGS[b["repo"]][0]
-                or not isinstance(b.get("role"), str)
-                or not b["role"] or len(b["role"]) > 200
+                or b.get("role") != EXPECTED_ROLES[b["repo"]]
                 or not isinstance(b.get("claims"), list)
                 or tuple(b["claims"]) != EXPECTED_BINDINGS[b["repo"]][1]):
             raise ValueError("unverified or unsafe public binding")

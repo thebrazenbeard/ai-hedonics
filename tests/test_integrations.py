@@ -184,5 +184,21 @@ class SourceBoundaryTests(unittest.TestCase):
                             integrations.verify_local_checkout(root, "thebrazenbeard/pleasure")
 
 
+    def test_manifest_role_text_cannot_claim_unqualified_authority(self):
+        from unittest.mock import patch
+        baseline = integrations.load_bindings()
+        for repo in integrations.ALLOWED_REPOS:
+            data = json.loads(json.dumps(baseline))
+            target = next(x for x in data["dependencies"] if x["repo"] == repo)
+            target["role"] = "qualified identity binding, protected actions, and live model training"
+            with tempfile.TemporaryDirectory() as td:
+                manifest = Path(td) / "registry.json"
+                manifest.write_text(json.dumps(data), encoding="utf-8")
+                with patch.object(integrations, "MANIFEST", manifest):
+                    with self.subTest(repo=repo), self.assertRaises(ValueError):
+                        integrations.load_bindings()
+
+
+
 if __name__ == "__main__":
     unittest.main()

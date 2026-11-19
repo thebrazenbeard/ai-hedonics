@@ -33,3 +33,7 @@ An exact pinned Git commit alone did not reject a local checkout whose configure
 ## Repository-root and linked-content containment (2026-11-18)
 
 A canonical origin URL and pinned HEAD are necessary but insufficient. A nested directory can inherit its parent's HEAD while changing the Python import root; tracked symlinks and Git submodules can introduce content outside the pinned top-level tree. The verifier now requires the checkout to be the Git repository root and rejects tracked symlink (120000) and gitlink (160000) index entries before any optional synthetic child execution. Adversarial fixtures test nested roots and both Git modes. This remains a Git-metadata/source hygiene check, not a cryptographic sandbox or attestation of privileged-host integrity.
+
+## Role-text integrity falsifier (2026-11-19)
+
+The previous registry validation allowed arbitrary nonempty `role` strings even while restricting `state` and `claims`. Adversarial fixtures demonstrated that all three dependencies could be relabeled with unqualified identity-binding, protected-effect and live-training language. The parser now requires exact per-repository role descriptions. This validates manifest semantics only; it does not attest authorship or grant runtime authority.
