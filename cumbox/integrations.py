@@ -8,11 +8,19 @@ import subprocess
 MANIFEST = Path(__file__).resolve().parents[1] / "contracts" / "REPOSITORY_BINDINGS_V1.json"
 SHA = re.compile(r"^[a-f0-9]{40}$")
 ALLOWED_REPOS = frozenset({"thebrazenbeard/sexuality", "thebrazenbeard/pleasure", "thebrazenbeard/meso-crct"})
-ALLOWED_STATES = {
-    "research_contract_only",
-    "optional_t0_diagnostic_only",
-    "optional_synthetic_diagnostic_only",
+EXPECTED_BINDINGS = {
+    "thebrazenbeard/sexuality": ("research_contract_only", ()),
+    "thebrazenbeard/pleasure": ("optional_t0_diagnostic_only", ("synthetic_T0_only",)),
+    "thebrazenbeard/meso-crct": (
+        "optional_synthetic_diagnostic_only", ("nonexecutable_reference_intents",)),
 }
+TOP_LEVEL_KEYS = frozenset({
+    "schema_version", "as_of", "allow_human_entry",
+    "allow_private_content_export", "dependencies", "aliases",
+})
+DEPENDENCY_KEYS = frozenset({
+    "repo", "sha", "state", "active_by_default", "role", "claims",
+})
 
 
 def load_bindings():
@@ -21,7 +29,9 @@ def load_bindings():
         data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ValueError("public source registry unavailable") from None
-    if (not isinstance(data, dict) or data.get("schema_version") != 1
+    if (not isinstance(data, dict) or set(data) != TOP_LEVEL_KEYS
+            or type(data.get("schema_version")) is not int
+            or data.get("schema_version") != 1
             or data.get("allow_human_entry") is not False
             or data.get("allow_private_content_export") is not False
             or not isinstance(data.get("dependencies"), list)
@@ -29,7 +39,7 @@ def load_bindings():
         raise ValueError("unsupported public binding contract")
     seen = set()
     for b in data["dependencies"]:
-        if (not isinstance(b, dict)
+        if (not isinstance(b, dict) or set(b) != DEPENDENCY_KEYS
                 or not isinstance(b.get("repo"), str)
                 or not b["repo"].startswith("thebrazenbeard/")
                 or b["repo"] in seen
@@ -37,11 +47,15 @@ def load_bindings():
                 or not isinstance(b.get("sha"), str)
                 or not SHA.fullmatch(b["sha"])
                 or b.get("active_by_default") is not False
-                or b.get("state") not in ALLOWED_STATES
+                or b.get("state") != EXPECTED_BINDINGS[b["repo"]][0]
+                or not isinstance(b.get("role"), str)
+                or not b["role"] or len(b["role"]) > 200
                 or not isinstance(b.get("claims"), list)
-                or "consent" in b["claims"]):
+                or tuple(b["claims"]) != EXPECTED_BINDINGS[b["repo"]][1]):
             raise ValueError("unverified or unsafe public binding")
         seen.add(b["repo"])
+    if seen != ALLOWED_REPOS:
+        raise ValueError("incomplete public source registry")
     if data["aliases"] != {"thebrazenbeard/orgasm": "thebrazenbeard/pleasure"}:
         raise ValueError("legacy alias must preserve Pleasure source identity")
     if data["aliases"]["thebrazenbeard/orgasm"] not in seen:

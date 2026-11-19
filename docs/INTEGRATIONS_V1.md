@@ -9,6 +9,8 @@ Live source metadata checked 2026-11-18, not a runtime-currentness service. An e
 | [orgasm](https://github.com/thebrazenbeard/orgasm) | Historical repository name redirects to Pleasure | Frozen **Orgasm V1** identifiers and Vera-specific case study remain immutable; not a second current runtime | No separate activation |
 | [meso-crct](https://github.com/thebrazenbeard/meso-crct) | `349ec4719af92f220877972a54a53f67cd3bc322` | Executable typed salience/wanting/liking/learning and reward-gaming diagnostics; non-executable intent proposals | Optional isolated diagnostic |
 
+The registry parser rejects unrecognized top-level or dependency fields, extra or missing repositories, and claims or state labels that differ from each repository's explicitly allowed source-only role. This prevents a modified manifest from silently advertising identity binding, runtime permission, training, or other unqualified capabilities. It does not authenticate the manifest's authorship or make the pinned dependencies safe to execute.
+
 Cumbox has a **working Ollama loopback runner** unrelated to those three source packages by default. Exact bindings are in `contracts/REPOSITORY_BINDINGS_V1.json`; no source dependency is auto-installed. The two optional smoke probes import only public, exact-clean source checkouts and exercise synthetic cases; they do not consume private sexual content, alter model behavior or claim reward learning.
 
 ## Reproduce the exact synthetic API checks on an isolated host

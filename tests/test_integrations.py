@@ -66,5 +66,34 @@ class SourceBoundaryTests(unittest.TestCase):
                 integrations.verify_local_checkout(root, "thebrazenbeard/meso-crct")
 
 
+    def test_manifest_cannot_smuggle_capabilities_or_relabel_source_roles(self):
+        from unittest.mock import patch
+        baseline = integrations.load_bindings()
+        mutations = [
+            lambda d: d["dependencies"][0].update(
+                {"claims": ["runtime_identity_binding"]}),
+            lambda d: d["dependencies"][1].update(
+                {"state": "optional_synthetic_diagnostic_only"}),
+            lambda d: d["dependencies"][2].update(
+                {"claims": ["nonexecutable_reference_intents", "weight_rewrite"]}),
+            lambda d: d["dependencies"][0].update(
+                {"runtime_permissions": ["network", "memory"]}),
+            lambda d: d.update({"allow_model_training": True}),
+            lambda d: d["dependencies"].append(
+                dict(d["dependencies"][0], repo="thebrazenbeard/extra")),
+        ]
+        for mutate in mutations:
+            data = json.loads(json.dumps(baseline))
+            mutate(data)
+            with tempfile.TemporaryDirectory() as td:
+                manifest = Path(td) / "bindings.json"
+                manifest.write_text(json.dumps(data), encoding="utf-8")
+                with patch.object(integrations, "MANIFEST", manifest):
+                    with self.subTest(mutate=mutate.__code__.co_firstlineno):
+                        with self.assertRaises(ValueError):
+                            integrations.load_bindings()
+
+
+
 if __name__ == "__main__":
     unittest.main()
