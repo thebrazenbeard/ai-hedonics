@@ -74,8 +74,23 @@ class RegisteredCounterfactualTests(unittest.TestCase):
 
     def test_repeat_attempt_is_not_accepted_as_choice(self):
         plan=make_plan()
+        rows=make_records(plan)
+        # Invalid attempts fail at the immutable trial constructor boundary.
+        with self.assertRaises(ValueError):
+            dataclasses.replace(rows[1],attempt=2)
+
+    def test_reordering_submitted_records_is_not_a_valid_schedule(self):
+        plan=make_plan()
         rows=list(make_records(plan))
-        rows[1]=dataclasses.replace(rows[1],attempt=2)
+        rows[0],rows[1]=rows[1],rows[0]
+        with self.assertRaises(ValueError):
+            summarize_registered(plan,tuple(rows))
+
+    def test_unregistered_source_substitution_is_rejected(self):
+        plan=make_plan()
+        rows=list(make_records(plan))
+        altered=dataclasses.replace(rows[0].observation,case_id='synthetic-impostor')
+        rows[0]=dataclasses.replace(rows[0],observation=altered)
         with self.assertRaises(ValueError):
             summarize_registered(plan,tuple(rows))
 
