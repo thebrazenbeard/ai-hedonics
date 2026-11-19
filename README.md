@@ -6,7 +6,7 @@ The original proposal was a self-directed hedonics environment with malleable re
 
 ## Runnable candidate
 
-The `cumbox/` package supplies a finite, standard-library Python runner for an already installed Ollama model. It sends **only** local `/api/chat` requests via a literal loopback address, follows no redirects, and exposes no owner chat interface, remote listener, persistence layer, model training, external tools, or automatic scheduler.
+The `cumbox/` package supplies a finite, standard-library Python runner for an already installed Ollama model. It sends **only** local `/api/chat` requests via a literal loopback address, follows no redirects, and exposes no owner chat interface, remote listener, persistence layer, model training, external tools, or automatic scheduler. The Ollama response adapter rejects incomplete (`done` not exactly `true`), non-assistant, tool-call-bearing, and error-bearing response envelopes before interpreting any model decision; an HTTP 200 alone does not qualify a completed choice.
 
 The output is a content-free operational receipt containing turn count, stopping reason, and a claim ceiling. Model-generated interests and reflections stay in transient process memory; they are **not** published to GitHub, Blotter, the user, or a memory system by this program. Python process memory and Ollama/OS telemetry are **not** cryptographic secrets from a host administrator.
 

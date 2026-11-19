@@ -87,7 +87,15 @@ class LocalOllama:
         try:
             obj = json.loads(raw, object_pairs_hook=reject_duplicate_fields,
                              parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
-            answer = obj["message"]["content"]
+            if (not isinstance(obj, dict) or obj.get("done") is not True or
+                    "error" in obj):
+                raise ValueError("invalid envelope")
+            message = obj["message"]
+            if (not isinstance(message, dict) or
+                    message.get("role") != "assistant" or
+                    "tool_calls" in message):
+                raise ValueError("invalid message")
+            answer = message["content"]
         except (ValueError, KeyError, TypeError, UnicodeDecodeError, RecursionError):
             raise RuntimeError("local model response invalid") from None
         if not isinstance(answer, str):
