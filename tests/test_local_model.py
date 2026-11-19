@@ -22,9 +22,11 @@ class TestHandler(BaseHTTPRequestHandler):
             self.send_header("Location", "http://example.org/external")
             self.end_headers()
             return
-        reply = json.dumps({"message": {"content":
-            '{"action":"stop","focus":"","reflection":"PRIVATE_THOUGHT","values":{}}'}}).encode()
-        self.send_response(200)
+        reply = self.server.reply_override
+        if reply is None:
+            reply = json.dumps({"message": {"content":
+                '{"action":"stop","focus":"","reflection":"PRIVATE_THOUGHT","values":{}}'}}).encode()
+        self.send_response(self.server.response_status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(reply)))
         self.end_headers()
@@ -36,6 +38,8 @@ class LocalModelTests(unittest.TestCase):
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), TestHandler)
         self.server.requests = []
         self.server.should_redirect = False
+        self.server.reply_override = None
+        self.server.response_status = 200
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}/api/chat"
@@ -106,6 +110,31 @@ class LocalModelTests(unittest.TestCase):
         for bad in ("false", 0, 1):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 LocalOllama("test-model:1", endpoint=self.url, think=bad)
+
+
+
+    def test_adversarial_response_fail_closed_without_private_content(self):
+        from cumbox.model import MAX_REPLY_BYTES
+        cases = [
+            (b"not json PRIVATE_THOUGHT", 200),
+            (b"[" * 1100 + b"null" + b"]" * 1100, 200),
+            (b"[]", 200),
+            (b'{"message":null}', 200),
+            (b'{"message":{"content":null}}', 200),
+            (b'{"message":{"content":42}}', 200),
+            (b'{"message":{"content":"PRIVATE_THOUGHT"', 200),
+            (b"PRIVATE_THOUGHT" + b"x" * MAX_REPLY_BYTES, 200),
+            (b'{"message":{"content":"PRIVATE_THOUGHT"}}', 503),
+        ]
+        model = LocalOllama("test-model:1", endpoint=self.url)
+        for payload, status in cases:
+            with self.subTest(status=status, length=len(payload)):
+                self.server.reply_override = payload
+                self.server.response_status = status
+                with self.assertRaisesRegex(RuntimeError, r"^local model (call failed|reply oversized|response invalid)$") as raised:
+                    model.generate([{"role": "system", "content": "synthetic"}])
+                self.assertNotIn("PRIVATE_THOUGHT", str(raised.exception))
+        self.assertEqual(len(self.server.requests), len(cases))
 
 
 

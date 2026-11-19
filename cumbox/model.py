@@ -79,7 +79,7 @@ class LocalOllama:
         try:
             obj = json.loads(raw)
             answer = obj["message"]["content"]
-        except (ValueError, KeyError, TypeError, UnicodeDecodeError):
+        except (ValueError, KeyError, TypeError, UnicodeDecodeError, RecursionError):
             raise RuntimeError("local model response invalid") from None
         if not isinstance(answer, str):
             raise RuntimeError("local model response invalid")
